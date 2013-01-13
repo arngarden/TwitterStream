@@ -21,11 +21,12 @@ POST_PARAMS = {'include_entities': 0,
                'track': 'iphone,ipad,ipod'}
 
 class TwitterStream:
-    def __init__(self):
+    def __init__(self, timeout=False):
         self.oauth_token = oauth.Token(key=OAUTH_KEYS['access_token_key'], secret=OAUTH_KEYS['access_token_secret'])
         self.oauth_consumer = oauth.Consumer(key=OAUTH_KEYS['consumer_key'], secret=OAUTH_KEYS['consumer_secret'])
         self.conn = None
         self.buffer = ''
+        self.timeout = timeout
         self.setup_connection()
 
     def setup_connection(self):
@@ -35,6 +36,10 @@ class TwitterStream:
             self.conn.close()
             self.buffer = ''
         self.conn = pycurl.Curl()
+        # Restart connection if less than 1 byte/s is received during "timeout" seconds
+        if isinstance(self.timeout, int):
+            self.conn.setopt(pycurl.LOW_SPEED_LIMIT, 1)
+            self.conn.setopt(pycurl.LOW_SPEED_TIME, self.timeout)
         self.conn.setopt(pycurl.URL, API_ENDPOINT_URL)
         self.conn.setopt(pycurl.USERAGENT, USER_AGENT)
         # Using gzip is optional but saves us bandwidth.
@@ -88,7 +93,7 @@ class TwitterStream:
                 print 'Waiting %s seconds' % backoff_http_error
                 time.sleep(backoff_http_error)
                 backoff_http_error = min(backoff_http_error * 2, 320)
-    
+
     def handle_tweet(self, data):
         """ This method is called when data is received through Streaming endpoint.
         """
@@ -106,7 +111,7 @@ class TwitterStream:
                 print 'Got warning: %s' % message['warning'].get('message')
             else:
                 print 'Got tweet with text: %s' % message.get('text')
- 
+
 
 if __name__ == '__main__':
     ts = TwitterStream()
